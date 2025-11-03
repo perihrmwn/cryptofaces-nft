@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>CryptoFaces - Profile Picture NFT</title>
 
-  <!-- Farcaster Mini App Meta -->
+  <!-- Farcaster Mini App Meta Tags (PASTIKAN DOMAINNYA BENAR) -->
   <meta name="fc:miniapp" content='{
     "version":"1",
     "imageUrl":"https://cryptofaces-nft.vercel.app/images/preview.png",
@@ -36,7 +36,11 @@
     @keyframes pulse { 0%,100% {opacity:1} 50% {opacity:.5} }
     .animate-pulse { animation: pulse 2s cubic-bezier(0.4,0,0.6,1) infinite }
     .hidden { display:none }
-    .nft-canvas { image-rendering: pixelated; image-rendering: -moz-crisp-edges; image-rendering: crisp-edges; }
+    .nft-canvas {
+      image-rendering: pixelated;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: crisp-edges;
+    }
   </style>
 </head>
 <body class="bg-gradient-to-br from-indigo-950 via-purple-900 to-pink-900">
@@ -46,67 +50,38 @@
     </div>
   </div>
 
-  <!-- SDK loader + storage shim (robust) -->
+  <!-- Farcaster MiniApp SDK + Storage shim -->
   <script type="module">
-    // Preload splash to avoid broken icon
-    new Image().src = "https://cryptofaces-nft.vercel.app/images/splash.png";
+    // Import MiniApp SDK (bukan frame-sdk)
+    import { sdk } from "https://esm.sh/@farcaster/miniapp-sdk";
+    // Ekspos agar bisa dipakai di class
+    window.farcasterSDK = sdk;
 
-    // Try official miniapp-sdk (ESM)
-    try {
-      const { sdk } = await import("https://esm.sh/@farcaster/miniapp-sdk");
-      window.__fc_sdk = sdk;
-    } catch (e) {
-      console.log("[miniapp-sdk] import failed:", e);
-    }
-
-    // Bridge from host (Warpcast/App) if available
-    if (!window.__fc_sdk && window.farcaster?.actions?.ready) {
-      window.__fc_sdk = window.farcaster;
-    }
-
-    // Fallback to frame-sdk
-    if (!window.__fc_sdk) {
-      try {
-        const { sdk } = await import("https://esm.sh/@farcaster/frame-sdk@0.0.7");
-        window.__fc_sdk = sdk;
-      } catch (e) {
-        console.log("[frame-sdk] fallback import failed:", e);
-      }
-    }
-
-    // Expose notifyReady
-    window.__notifyReady = async () => {
-      try {
-        if (window.__fc_sdk?.actions?.ready) {
-          await window.__fc_sdk.actions.ready();
-          console.log("[FC] actions.ready() sent");
-        }
-      } catch (err) {
-        console.log("[FC] ready error:", err);
-      }
-    };
-
-    // Storage shim (fallback ke localStorage saat bukan di Farcaster)
+    // Storage shim: samakan API yang kamu pakai dengan localStorage
     if (!window.storage) {
       window.storage = {
-        async get(key){ const v = localStorage.getItem(key); return v ? { value: v } : null; },
-        async set(key,val){ localStorage.setItem(key,val); return true; },
-        async list(prefix="", startsWith=true){
-          const keys=[];
-          for(let i=0;i<localStorage.length;i++){
-            const k=localStorage.key(i);
-            if(!prefix || (startsWith? k.startsWith(prefix): k.includes(prefix))) keys.push(k);
+        async get(key) {
+          const v = localStorage.getItem(key);
+          return v ? { value: v } : null;
+        },
+        async set(key, value) {
+          localStorage.setItem(key, value);
+          return true;
+        },
+        // list(prefix, startsWith=true)
+        async list(prefix = "", startsWith = true) {
+          const keys = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (!prefix) keys.push(k);
+            else if (startsWith ? k.startsWith(prefix) : k.includes(prefix)) keys.push(k);
           }
           return { keys };
         }
       };
     }
 
-    // Safety: also call ready on window load
-    window.addEventListener("load", () => window.__notifyReady?.());
-  </script>
-
-  <script>
+    // ---- App code (asli kamu, dengan sedikit perbaikan kecil) ----
     class CryptoFacesNFT {
       constructor() {
         this.state = {
@@ -117,9 +92,15 @@
           allNFTs: [],
           isGenerating: false,
           isMinting: false,
-          mintPrice: 0.001,
+          mintPrice: 0.001, // ETH
           totalSupply: 0,
-          traits: { background:null, face:null, eyes:null, mouth:null, accessory:null },
+          traits: {
+            background: null,
+            face: null,
+            eyes: null,
+            mouth: null,
+            accessory: null
+          },
           initialized: false
         };
 
@@ -131,7 +112,7 @@
             { name: 'Golden Sunset', color: '#f59e0b', rarity: 'Rare' },
             { name: 'Pink Paradise', color: '#ec4899', rarity: 'Rare' },
             { name: 'Dark Matter', color: '#1f2937', rarity: 'Epic' },
-            { name: 'Rainbow', gradient: 'linear-gradient(45deg,#f59e0b,#ec4899,#a855f7)', rarity: 'Legendary' }
+            { name: 'Rainbow', gradient: 'linear-gradient(45deg, #f59e0b, #ec4899, #a855f7)', rarity: 'Legendary' }
           ],
           face: [
             { name: 'Happy', emoji: '😊', rarity: 'Common' },
@@ -181,59 +162,79 @@
 
       async initFarcasterContext() {
         try {
-          const sdk = window.__fc_sdk;
-          if (sdk?.context) {
-            const ctx = await sdk.context;
-            if (ctx?.user) {
-              this.state.userData.fid = ctx.user.fid;
-              this.state.userData.username = ctx.user.username || this.state.userData.username;
+          if (window.farcasterSDK) {
+            const context = await window.farcasterSDK.context; // optional: FID/username
+            if (context?.user) {
+              this.state.userData.fid = context.user.fid;
+              this.state.userData.username = context.user.username || this.state.userData.username;
             }
+            // ⬇️ WAJIB: beri tahu MiniApp bahwa UI sudah siap (hilangkan splash)
+            await window.farcasterSDK.actions.ready();
           }
-          // panggil ready via helper (juga dipanggil ulang setelah render)
-          await window.__notifyReady?.();
-        } catch (e) {
-          console.log("Farcaster context error:", e);
+        } catch (error) {
+          console.log('Farcaster context not available', error);
         }
       }
 
       async initUser() {
-        const fid = Math.floor(Math.random()*10000);
+        const fid = Math.floor(Math.random() * 10000);
         const walletAddress = `0x${Math.random().toString(16).slice(2).padEnd(40,'0')}`;
+
         try {
           const stored = await window.storage.get(`user:${fid}`);
           if (stored) {
             this.state.userData = JSON.parse(stored.value);
           } else {
-            this.state.userData = { fid, username:`user${fid}`, walletAddress, mintedCount:0, joinedAt: Date.now() };
+            this.state.userData = {
+              fid,
+              username: `user${fid}`,
+              walletAddress,
+              mintedCount: 0,
+              joinedAt: Date.now()
+            };
             await window.storage.set(`user:${fid}`, JSON.stringify(this.state.userData));
           }
-        } catch {
-          this.state.userData = { fid, username:`user${fid}`, walletAddress, mintedCount:0, joinedAt: Date.now() };
+        } catch (error) {
+          this.state.userData = {
+            fid,
+            username: `user${fid}`,
+            walletAddress,
+            mintedCount: 0,
+            joinedAt: Date.now()
+          };
         }
         this.state.initialized = true;
       }
 
       async loadUserNFTs() {
         try {
-          const r = await window.storage.get(`nfts:${this.state.userData.fid}`);
-          this.state.myNFTs = r ? JSON.parse(r.value) : [];
-        } catch { this.state.myNFTs = []; }
+          const result = await window.storage.get(`nfts:${this.state.userData.fid}`);
+          this.state.myNFTs = result ? JSON.parse(result.value) : [];
+        } catch {
+          this.state.myNFTs = [];
+        }
       }
 
       async loadAllNFTs() {
         try {
           const keys = await window.storage.list('nft:', true);
-          if (keys?.keys?.length) {
+          if (keys && keys.keys) {
             const nfts = await Promise.all(
-              keys.keys.slice(0, 200).map(async k => {
-                try { const r = await window.storage.get(k, true); return r ? JSON.parse(r.value) : null; }
-                catch { return null; }
+              keys.keys.slice(0, 200).map(async (key) => {
+                try {
+                  const result = await window.storage.get(key, true);
+                  return result ? JSON.parse(result.value) : null;
+                } catch {
+                  return null;
+                }
               })
             );
-            this.state.allNFTs = nfts.filter(Boolean).sort((a,b)=>b.mintedAt-a.mintedAt);
+            this.state.allNFTs = nfts.filter(Boolean).sort((a, b) => b.mintedAt - a.mintedAt);
             this.state.totalSupply = this.state.allNFTs.length;
           }
-        } catch { this.state.allNFTs = []; }
+        } catch {
+          this.state.allNFTs = [];
+        }
       }
 
       generateRandomNFT() {
@@ -247,12 +248,22 @@
         this.state.nftPreview = this.generateNFTData();
       }
 
-      randomTrait(cat) {
-        const opts = this.traitOptions[cat];
-        const w = opts.map(o => o.rarity==='Common'?40:o.rarity==='Rare'?25:o.rarity==='Epic'?15:o.rarity==='Legendary'?5:1);
-        const total = w.reduce((a,b)=>a+b,0); let r = Math.random()*total;
-        for (let i=0;i<opts.length;i++){ if (r<w[i]) return opts[i]; r-=w[i]; }
-        return opts[0];
+      randomTrait(category) {
+        const options = this.traitOptions[category];
+        const weights = options.map(o => {
+          if (o.rarity === 'Common') return 40;
+          if (o.rarity === 'Rare') return 25;
+          if (o.rarity === 'Epic') return 15;
+          if (o.rarity === 'Legendary') return 5;
+          return 1;
+        });
+        const totalWeight = weights.reduce((a, b) => a + b, 0);
+        let r = Math.random() * totalWeight;
+        for (let i = 0; i < options.length; i++) {
+          if (r < weights[i]) return options[i];
+          r -= weights[i];
+        }
+        return options[0];
       }
 
       generateNFTData() {
@@ -269,76 +280,56 @@
       }
 
       calculateRarity() {
-        const rs = Object.values(this.state.traits).map(t=>t.rarity);
-        const l = rs.filter(r=>r==='Legendary').length;
-        const e = rs.filter(r=>r==='Epic').length;
-        if (l>=3) return 'Legendary';
-        if (l>=2 || e>=3) return 'Epic';
-        if (l>=1 || e>=2) return 'Rare';
+        const rarities = Object.values(this.state.traits).map(t => t.rarity);
+        const legendaryCount = rarities.filter(r => r === 'Legendary').length;
+        const epicCount = rarities.filter(r => r === 'Epic').length;
+        if (legendaryCount >= 3) return 'Legendary';
+        if (legendaryCount >= 2 || epicCount >= 3) return 'Epic';
+        if (legendaryCount >= 1 || epicCount >= 2) return 'Rare';
         return 'Common';
       }
 
-      // ===== Share to Warpcast =====
-      getRarityIcon(r){ return ({Common:'⚪',Rare:'🔵',Epic:'🟣',Legendary:'🟡'})[r] || '⚪'; }
-      getRarityTextColor(r){ return ({Common:'text-gray-300',Rare:'text-blue-400',Epic:'text-purple-400',Legendary:'text-yellow-400'})[r] || 'text-gray-300'; }
-      getRarityBorder(r){ return ({Common:'border-gray-500',Rare:'border-blue-500',Epic:'border-purple-500',Legendary:'border-yellow-500'})[r] || 'border-gray-500'; }
-
-      getShareText(nft){
-        const url = "https://cryptofaces-nft.vercel.app";
-        return `I just minted my CryptoFace #${nft.tokenId}! ${this.getRarityIcon(nft.rarity)} ${nft.rarity}\nMint yours: ${url}`;
-      }
-      async shareOnWarpcast(nft){
-        const text = this.getShareText(nft);
-        const compose = `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}`;
-        try {
-          if (window.__fc_sdk?.actions?.openUrl) await window.__fc_sdk.actions.openUrl({ url: compose });
-          else window.open(compose, "_blank");
-        } catch (e) {
-          console.error("Share failed:", e);
-          window.open(compose, "_blank");
-        }
-      }
-
-      async mintNFT(){
+      async mintNFT() {
         if (this.state.isMinting) return;
-        this.state.isMinting = true; this.render();
+        this.state.isMinting = true;
+        this.render();
 
-        await new Promise(r=>setTimeout(r,1300)); // simulasi
+        // simulasi transaksi
+        await new Promise(r => setTimeout(r, 1500));
+
         const nft = this.state.nftPreview;
-
-        try{
+        try {
           this.state.myNFTs.unshift(nft);
           await window.storage.set(`nfts:${this.state.userData.fid}`, JSON.stringify(this.state.myNFTs));
           await window.storage.set(`nft:${nft.id}`, JSON.stringify(nft), true);
           this.state.userData.mintedCount++;
           await window.storage.set(`user:${this.state.userData.fid}`, JSON.stringify(this.state.userData));
           await this.loadAllNFTs();
-
           this.state.isMinting = false;
           this.state.activeTab = 'my-nfts';
           this.render();
           this.generateRandomNFT();
-          alert(`🎉 NFT Minted Successfully!\n\nToken ID: #${nft.tokenId}\nRarity: ${nft.rarity}`);
-
-          if (confirm("Share your minted CryptoFace on Warpcast?")) {
-            await this.shareOnWarpcast(nft);
-          }
-        } catch(e){
-          console.error("Mint failed:", e);
-          this.state.isMinting = false; this.render();
-          alert("❌ Mint failed. Please try again.");
+          alert('🎉 NFT Minted Successfully!\n\nToken ID: #' + nft.tokenId + '\nRarity: ' + nft.rarity);
+        } catch (error) {
+          console.error('Mint failed:', error);
+          this.state.isMinting = false;
+          this.render();
+          alert('❌ Mint failed. Please try again.');
         }
       }
 
-      setActiveTab(t){ this.state.activeTab = t; this.render(); }
+      setActiveTab(tab) {
+        this.state.activeTab = tab;
+        this.render();
+      }
 
-      renderNFTCard(nft, size='large'){
-        const sizeClass = size==='small'?'w-32 h-32':'w-64 h-64';
-        const faceSize = size==='small'?'text-5xl':'text-9xl';
-        const accessorySize = size==='small'?'text-2xl -top-4':'text-5xl -top-8';
-        const bgStyle = nft.traits.background?.gradient
-          ? `background:${nft.traits.background.gradient};`
-          : `background-color:${nft.traits.background?.color};`;
+      renderNFTCard(nft, size = 'large') {
+        const sizeClass = size === 'small' ? 'w-32 h-32' : 'w-64 h-64';
+        const faceSize = size === 'small' ? 'text-5xl' : 'text-9xl';
+        const accessorySize = size === 'small' ? 'text-2xl -top-4' : 'text-5xl -top-8';
+        const bgStyle = nft.traits.background.gradient
+          ? `background: ${nft.traits.background.gradient};`
+          : `background-color: ${nft.traits.background.color};`;
         return `
           <div class="${sizeClass} rounded-2xl overflow-hidden shadow-2xl relative nft-canvas border-4 ${this.getRarityBorder(nft.rarity)}" style="${bgStyle}">
             <div class="absolute inset-0 flex items-center justify-center">
@@ -347,24 +338,40 @@
                 ${nft.traits.accessory.emoji ? `<div class="${accessorySize} absolute left-1/2 transform -translate-x-1/2">${nft.traits.accessory.emoji}</div>` : ''}
               </div>
             </div>
-            ${size==='large'?`
-              <div class="absolute bottom-0 left-0 right-0 bg-black/70 p-3">
+            ${size === 'large' ? `
+              <div class="absolute bottom-0 left-0 right-0 bg-black bg-opacity-70 p-3">
                 <div class="text-white text-center">
                   <div class="text-xs font-mono mb-1">#${nft.tokenId}</div>
                   <div class="text-sm font-bold ${this.getRarityTextColor(nft.rarity)}">${this.getRarityIcon(nft.rarity)} ${nft.rarity}</div>
                 </div>
-              </div>`:''}
-          </div>`;
+              </div>` : ''
+            }
+          </div>
+        `;
       }
 
-      render(){
+      getRarityIcon(rarity) {
+        const icons = { 'Common': '⚪', 'Rare': '🔵', 'Epic': '🟣', 'Legendary': '🟡' };
+        return icons[rarity] || '⚪';
+      }
+      getRarityTextColor(rarity) {
+        const colors = { 'Common': 'text-gray-300', 'Rare': 'text-blue-400', 'Epic': 'text-purple-400', 'Legendary': 'text-yellow-400' };
+        return colors[rarity] || 'text-gray-300';
+      }
+      getRarityBorder(rarity) {
+        const borders = { 'Common': 'border-gray-500', 'Rare': 'border-blue-500', 'Epic': 'border-purple-500', 'Legendary': 'border-yellow-500' };
+        return borders[rarity] || 'border-gray-500';
+      }
+
+      render() {
         const { userData, activeTab, nftPreview, myNFTs, allNFTs, isMinting, mintPrice, totalSupply, initialized } = this.state;
         if (!initialized) return;
-        const root = document.getElementById('app');
+        const app = document.getElementById('app');
 
-        root.innerHTML = `
+        app.innerHTML = `
           <div class="min-h-screen text-white pb-20">
-            <div class="bg-black/40 backdrop-blur-lg p-4 sticky top-0 z-10 border-b border-purple-500">
+            <!-- Header -->
+            <div class="bg-black bg-opacity-40 backdrop-blur-lg p-4 sticky top-0 z-10 border-b border-purple-500">
               <div class="flex justify-between items-center">
                 <div>
                   <h1 class="text-2xl font-bold bg-gradient-to-r from-yellow-400 via-pink-500 to-purple-500 bg-clip-text text-transparent">CryptoFaces NFT</h1>
@@ -377,34 +384,37 @@
               </div>
             </div>
 
+            <!-- Tabs -->
             <div class="flex gap-2 p-4">
-              <button onclick="app.setActiveTab('create')" class="${activeTab==='create'?'bg-gradient-to-r from-purple-600 to-pink-600 shadow-lg scale-105':'bg-white/10 hover:bg-white/20'} flex-1 py-3 rounded-xl font-semibold transition-all">🎨 Create</button>
-              <button onclick="app.setActiveTab('my-nfts')" class="${activeTab==='my-nfts'?'bg-gradient-to-r from-purple-600 to-pink-600 shadow-lg scale-105':'bg-white/10 hover:bg-white/20'} flex-1 py-3 rounded-xl font-semibold transition-all">🖼️ My NFTs (${myNFTs.length})</button>
-              <button onclick="app.setActiveTab('gallery')" class="${activeTab==='gallery'?'bg-gradient-to-r from-purple-600 to-pink-600 shadow-lg scale-105':'bg-white/10 hover:bg-white/20'} flex-1 py-3 rounded-xl font-semibold transition-all">🌟 Gallery</button>
+              <button onclick="app.setActiveTab('create')" class="${activeTab === 'create' ? 'bg-gradient-to-r from-purple-600 to-pink-600 shadow-lg scale-105' : 'bg-white bg-opacity-10 hover:bg-opacity-20'} flex-1 py-3 rounded-xl font-semibold transition-all">🎨 Create</button>
+              <button onclick="app.setActiveTab('my-nfts')" class="${activeTab === 'my-nfts' ? 'bg-gradient-to-r from-purple-600 to-pink-600 shadow-lg scale-105' : 'bg-white bg-opacity-10 hover:bg-opacity-20'} flex-1 py-3 rounded-xl font-semibold transition-all">🖼️ My NFTs (${myNFTs.length})</button>
+              <button onclick="app.setActiveTab('gallery')" class="${activeTab === 'gallery' ? 'bg-gradient-to-r from-purple-600 to-pink-600 shadow-lg scale-105' : 'bg-white bg-opacity-10 hover:bg-opacity-20'} flex-1 py-3 rounded-xl font-semibold transition-all">🌟 Gallery</button>
             </div>
 
             <div class="p-4">
-              <div class="${activeTab==='create'?'':'hidden'}">
+              <!-- Create -->
+              <div class="${activeTab === 'create' ? '' : 'hidden'}">
                 <div class="max-w-md mx-auto space-y-6">
                   <div class="flex justify-center animate-float">
-                    ${this.renderNFTCard(nftPreview,'large')}
+                    ${this.renderNFTCard(nftPreview, 'large')}
                   </div>
 
-                  <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-4">
+                  <div class="bg-white bg-opacity-10 backdrop-blur-lg rounded-2xl p-4">
                     <h3 class="text-lg font-bold mb-3 text-center">🎯 Traits</h3>
                     <div class="space-y-2 text-sm">
-                      ${Object.entries(nftPreview.traits).map(([k,v])=>`
-                        <div class="flex justify-between items-center bg-black/30 rounded-lg p-2">
-                          <span class="capitalize text-purple-300">${k}</span>
-                          <span class="font-bold">${v.name} ${this.getRarityIcon(v.rarity)}</span>
+                      ${Object.entries(nftPreview.traits).map(([key, value]) => `
+                        <div class="flex justify-between items-center bg-black bg-opacity-30 rounded-lg p-2">
+                          <span class="capitalize text-purple-300">${key}</span>
+                          <span class="font-bold">${value.name} ${this.getRarityIcon(value.rarity)}</span>
                         </div>
                       `).join('')}
                     </div>
                     <div class="mt-4 text-center">
                       <div class="inline-block px-4 py-2 rounded-full font-bold ${
-                        nftPreview.rarity==='Legendary'?'bg-gradient-to-r from-yellow-400 to-orange-500':
-                        nftPreview.rarity==='Epic'?'bg-gradient-to-r from-purple-500 to-pink-500':
-                        nftPreview.rarity==='Rare'?'bg-gradient-to-r from-blue-500 to-cyan-500':'bg-gray-600'
+                        nftPreview.rarity === 'Legendary' ? 'bg-gradient-to-r from-yellow-400 to-orange-500' :
+                        nftPreview.rarity === 'Epic' ? 'bg-gradient-to-r from-purple-500 to-pink-500' :
+                        nftPreview.rarity === 'Rare' ? 'bg-gradient-to-r from-blue-500 to-cyan-500' :
+                        'bg-gray-600'
                       }">
                         ${this.getRarityIcon(nftPreview.rarity)} ${nftPreview.rarity} NFT
                       </div>
@@ -412,44 +422,47 @@
                   </div>
 
                   <div class="space-y-3">
-                    <button onclick="app.generateRandomNFT(); app.render();" class="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 font-bold py-4 rounded-xl transition-all shadow-lg hover:shadow-cyan-500/50 active:scale-95">🔄 Generate New Face</button>
-                    <button onclick="app.mintNFT()" ${isMinting?'disabled':''} class="${isMinting?'opacity-50 cursor-not-allowed':'hover:shadow-emerald-500/50 active:scale-95'} w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 font-bold py-4 rounded-xl transition-all shadow-lg">
-                      ${isMinting?'⏳ Minting...':`💎 Mint NFT (${mintPrice} ETH)`}
+                    <button onclick="app.generateRandomNFT(); app.render();" class="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 font-bold py-4 rounded-xl transition-all shadow-lg hover:shadow-cyan-500/50 active:scale-95">
+                      🔄 Generate New Face
                     </button>
-                    <button onclick="app.state.myNFTs?.[0] ? app.shareOnWarpcast(app.state.myNFTs[0]) : alert('Mint first, then share!')" class="w-full bg-white/10 hover:bg-white/20 font-bold py-3 rounded-xl transition-all border border-white/20">📣 Share on Warpcast</button>
+                    <button onclick="app.mintNFT()" ${isMinting ? 'disabled' : ''} class="${isMinting ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-emerald-500/50 active:scale-95'} w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 font-bold py-4 rounded-xl transition-all shadow-lg">
+                      ${isMinting ? '⏳ Minting...' : `💎 Mint NFT (${mintPrice} ETH)`}
+                    </button>
                   </div>
 
                   <div class="grid grid-cols-2 gap-4">
                     <div class="bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl p-4 text-center">
-                      <div class="text-3xl font-bold">${totalSupply}</div><div class="text-xs">Total Minted</div>
+                      <div class="text-3xl font-bold">${totalSupply}</div>
+                      <div class="text-xs">Total Minted</div>
                     </div>
                     <div class="bg-gradient-to-br from-blue-600 to-cyan-600 rounded-xl p-4 text-center">
-                      <div class="text-3xl font-bold">${myNFTs.length}</div><div class="text-xs">Your Collection</div>
+                      <div class="text-3xl font-bold">${myNFTs.length}</div>
+                      <div class="text-xs">Your Collection</div>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div class="${activeTab==='my-nfts'?'':'hidden'}">
-                ${myNFTs.length===0?`
+              <!-- My NFTs -->
+              <div class="${activeTab === 'my-nfts' ? '' : 'hidden'}">
+                ${myNFTs.length === 0 ? `
                   <div class="text-center py-16">
                     <div class="text-6xl mb-4">🎨</div>
                     <h3 class="text-2xl font-bold mb-2">No NFTs Yet</h3>
                     <p class="text-purple-300 mb-6">Create and mint your first CryptoFace!</p>
                     <button onclick="app.setActiveTab('create')" class="bg-gradient-to-r from-purple-600 to-pink-600 px-6 py-3 rounded-xl font-bold hover:shadow-lg transition-all">Start Creating</button>
                   </div>
-                `:`
+                ` : `
                   <div class="grid grid-cols-2 gap-4">
-                    ${myNFTs.map((nft,i)=>`
-                      <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-3 hover:scale-105 transition-all">
+                    ${myNFTs.map(nft => `
+                      <div class="bg-white bg-opacity-10 backdrop-blur-lg rounded-2xl p-3 hover:scale-105 transition-all cursor-pointer">
                         <div class="flex justify-center mb-3">
-                          ${this.renderNFTCard(nft,'small')}
+                          ${this.renderNFTCard(nft, 'small')}
                         </div>
                         <div class="text-center">
                           <div class="text-xs text-purple-300 mb-1 font-mono">#${nft.tokenId}</div>
-                          <div class="text-sm font-bold ${this.getRarityTextColor(nft.rarity)}">${this.getRarityIcon(nft.rarity)} ${nft.rarity}</div>
-                          <div class="mt-2">
-                            <button class="text-xs px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 border border-white/10" onclick="app.shareOnWarpcast(app.state.myNFTs[${i}])">📣 Share on Warpcast</button>
+                          <div class="text-sm font-bold ${this.getRarityTextColor(nft.rarity)}">
+                            ${this.getRarityIcon(nft.rarity)} ${nft.rarity}
                           </div>
                         </div>
                       </div>
@@ -458,27 +471,30 @@
                 `}
               </div>
 
-              <div class="${activeTab==='gallery'?'':'hidden'}">
+              <!-- Gallery -->
+              <div class="${activeTab === 'gallery' ? '' : 'hidden'}">
                 <div class="mb-4 text-center">
                   <h3 class="text-xl font-bold mb-1">🌟 Community Gallery</h3>
                   <p class="text-sm text-purple-300">${totalSupply} CryptoFaces Minted</p>
                 </div>
-                ${allNFTs.length===0?`
+                ${allNFTs.length === 0 ? `
                   <div class="text-center py-16">
                     <div class="text-6xl mb-4">🖼️</div>
                     <h3 class="text-xl font-bold mb-2">Gallery is Empty</h3>
                     <p class="text-purple-300">Be the first to mint!</p>
                   </div>
-                `:`
+                ` : `
                   <div class="grid grid-cols-2 gap-4">
-                    ${allNFTs.map(nft=>`
-                      <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-3 hover:scale-105 transition-all">
+                    ${allNFTs.map(nft => `
+                      <div class="bg-white bg-opacity-10 backdrop-blur-lg rounded-2xl p-3 hover:scale-105 transition-all cursor-pointer">
                         <div class="flex justify-center mb-3">
-                          ${this.renderNFTCard(nft,'small')}
+                          ${this.renderNFTCard(nft, 'small')}
                         </div>
                         <div class="text-center">
                           <div class="text-xs text-purple-300 mb-1">by @${nft.owner}</div>
-                          <div class="text-sm font-bold ${this.getRarityTextColor(nft.rarity)}">${this.getRarityIcon(nft.rarity)} ${nft.rarity}</div>
+                          <div class="text-sm font-bold ${this.getRarityTextColor(nft.rarity)}">
+                            ${this.getRarityIcon(nft.rarity)} ${nft.rarity}
+                          </div>
                         </div>
                       </div>
                     `).join('')}
@@ -488,15 +504,13 @@
             </div>
           </div>
         `;
-
-        // === IMPORTANT: tell host our UI is ready ===
-        requestAnimationFrame(() => window.__notifyReady?.());
-        setTimeout(() => window.__notifyReady?.(), 1200); // failsafe
       }
     }
 
     // Boot
-    document.addEventListener('DOMContentLoaded', () => { window.app = new CryptoFacesNFT(); });
+    document.addEventListener('DOMContentLoaded', () => {
+      window.app = new CryptoFacesNFT();
+    });
   </script>
 </body>
 </html>
