@@ -4,8 +4,7 @@
     { "src": "server.js", "use": "@vercel/node" }
   ],
   "routes": [
-    { "src": "/.well-known/farcaster.json", "dest": "/public/.well-known/farcaster.json" },
-    { "src": "/images/(.*)", "dest": "/public/images/$1" },
+    { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/server.js" }
   ]
 }
