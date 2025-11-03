@@ -16,7 +16,7 @@
     "subtitle": "Generate unique profile picture NFTs",
     "description": "Create and mint unique profile picture NFTs with randomized traits. Each CryptoFace is one-of-a-kind with different rarity levels from Common to Legendary!",
     "tags": ["nft", "pfp", "art", "collectibles"],
-    "primaryCategory": "collectibles",
+    "primaryCategory": "art-creativity",
     "screenshotUrls": [
       "https://cryptofaces-nft.vercel.app/images/screenshot1.png",
       "https://cryptofaces-nft.vercel.app/images/screenshot2.png"
