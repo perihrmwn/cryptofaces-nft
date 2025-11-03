@@ -1,0 +1,25 @@
+{
+  "accountAssociation": {
+    "header": "",
+    "payload": "",
+    "signature": ""
+  },
+  "miniapp": {
+    "version": "1",
+    "name": "CryptoFaces NFT",
+    "iconUrl": "https://YOUR-URL-HERE.vercel.app/images/icon.png",
+    "homeUrl": "https://YOUR-URL-HERE.vercel.app",
+    "imageUrl": "https://YOUR-URL-HERE.vercel.app/images/preview.png",
+    "buttonTitle": "🎨 Create Your NFT",
+    "splashImageUrl": "https://YOUR-URL-HERE.vercel.app/images/splash.png",
+    "splashBackgroundColor": "#1e1b4b",
+    "subtitle": "Generate unique profile picture NFTs",
+    "description": "Create and mint unique profile picture NFTs with randomized traits. Each CryptoFace is one-of-a-kind with different rarity levels from Common to Legendary!",
+    "tags": ["nft", "pfp", "art", "collectibles"],
+    "primaryCategory": "collectibles",
+    "screenshotUrls": [
+      "https://YOUR-URL-HERE.vercel.app/images/screenshot1.png",
+      "https://YOUR-URL-HERE.vercel.app/images/screenshot2.png"
+    ]
+  }
+}
