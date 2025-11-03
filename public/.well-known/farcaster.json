@@ -8,7 +8,7 @@
     "splashImageUrl": "https://cryptofaces-nft.vercel.app/splash.png",
     "splashBackgroundColor": "#1e1b4b",
     "webhookUrl": "https://cryptofaces-nft.vercel.app/api/webhook",
-    "subtitle": "Create & mint PFP NFTs",
+    "subtitle": "Mint your CryptoFaces PFP",
     "description": "Create and mint unique profile picture NFTs with randomized traits. Each CryptoFace is one-of-a-kind with different rarity levels from Common to Legendary!",
     "primaryCategory": "art-creativity"
   },
